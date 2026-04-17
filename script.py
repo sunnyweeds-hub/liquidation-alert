@@ -12,40 +12,44 @@ def send_discord_message(content):
     requests.post(DISCORD_WEBHOOK_URL, json=payload)
 
 def get_liquidation_data():
-    """바이낸스에서 데이터를 가져오고 에러를 상세히 출력합니다."""
+    """바이낸스에서 데이터를 가져오며, 202 에러 발생 시 재시도합니다."""
     url = "https://fapi1.binance.com/fapi/v1/allForceOrders"
     params = {"symbol": "BTCUSDT"}
     
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        
-        # 1. 응답 코드가 200(성공)이 아닐 경우
-        if response.status_code != 200:
-            return f"❌ 바이낸스 API 연결 실패 (코드: {response.status_code})\n이유: {response.text}"
-        
-        data = response.json()
-        
-        # 2. 데이터가 비어있는 리스트인 경우
-        if not data:
-            return "✅ 현재 바이낸스에 최근 청산 내역이 없습니다. (시장이 평온합니다)"
-
-        # 3. 데이터 정리
-        recent_orders = data[-5:] # 최신 5개
-        msg = "🔔 **바이낸스 BTC 청산 리포트** 🔔\n"
-        
-        count = 0
-        for order in recent_orders:
-            side = "🟢 LONG" if order['side'] == 'SELL' else "🔴 SHORT"
-            price = float(order['price'])
-            qty = float(order['origQty'])
-            usd = price * qty
+    # 최대 3번까지 다시 시도합니다.
+    for i in range(3):
+        try:
+            response = requests.get(url, params=params, timeout=10)
             
-            # 테스트를 위해 기준을 $100로 낮췄습니다. 잘 나오면 나중에 올리세요.
-            if usd >= 100: 
+            # 202 에러일 경우: 잠시 쉬었다가 다시 시도
+            if response.status_code == 202:
+                print(f"⚠️ 데이터 준비 중(202)... {i+1}번째 재시도 중입니다.")
+                time.sleep(2) # 2초 대기
+                continue
+                
+            if response.status_code != 200:
+                return f"❌ API 오류 (코드: {response.status_code})\n{response.text}"
+            
+            data = response.json()
+            if not data:
+                return "✅ 현재 큰 청산 내역이 없습니다."
+
+            # 데이터 가공
+            recent_orders = data[-3:]
+            msg = "🔔 **바이낸스 실시간 청산 리포트** 🔔\n"
+            for order in recent_orders:
+                side = "🟢 LONG" if order['side'] == 'SELL' else "🔴 SHORT"
+                price = float(order['price'])
+                qty = float(order['origQty'])
+                usd = price * qty
                 msg += f"> **{side}** | 가격: ${price:,.2f} | 규모: **${usd:,.2f}**\n"
-                count += 1
-        
-        return msg if count > 0 else "✅ 최근 $100 이상의 큰 청산은 없습니다."
+            
+            return msg
+
+        except Exception as e:
+            return f"❌ 실행 중 에러 발생: {str(e)}"
+            
+    return "❌ 3번 시도했으나 데이터가 준비되지 않았습니다. (202 지속)"
 
     except Exception as e:
         # 어떤 에러인지 정확히 출력하게 함
