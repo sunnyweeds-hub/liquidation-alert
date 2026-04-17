@@ -1,4 +1,5 @@
 import requests
+import time
 
 # === 설정 구간 ===
 # 아까 복사한 디스코드 웹훅 URL을 이 따옴표 안에 붙여넣으세요.
