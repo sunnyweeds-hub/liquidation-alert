@@ -13,7 +13,7 @@ def send_discord_message(content):
 
 def get_liquidation_data():
     """바이낸스에서 데이터를 가져오고 에러를 상세히 출력합니다."""
-    url = "https://fapi.binance.com/fapi/v1/allForceOrders"
+    url = "https://fapi1.binance.com/fapi/v1/allForceOrders"
     params = {"symbol": "BTCUSDT"}
     
     try:
